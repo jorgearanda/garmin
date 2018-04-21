@@ -104,6 +104,7 @@ def login(agent, username, password):
 
     # In theory, we're in.
 
+
 def file_exists_in_folder(filename, folder):
     "Check if the file exists in folder of any subfolder"
     for _, _, files in os.walk(folder):
@@ -111,27 +112,80 @@ def file_exists_in_folder(filename, folder):
             return True
     return False
 
-def activities(agent, outdir, increment = 100):
+
+def prepare_summary_file(directory):
+    filename = directory + '/activities.csv'
+    summary_file = open(filename, 'w')
+
+    header = 'activityId,activityName,aerobicTrainingEffect,averageHR,' + \
+        'averageRunningCadenceInStepsPerMinute,averageSpeed,' + \
+        'avgGroundContactBalance,avgGroundContactTime,avgStrideLength,' + \
+        'avgVerticalOscillation,avgVerticalRatio,beginTimestamp,calories,' + \
+        'distance,duration,elevationGain,elevationLoss,maxElevation,maxHR,' + \
+        'maxSpeed,minElevation,startTimeLocal,steps\n'
+    summary_file.write(header.encode('utf8'))
+
+    return summary_file
+
+
+def summarize_activity(act):
+    csv = str(act['activityId']) + ','
+    csv += act['activityName'] + ','
+    csv += str(act['aerobicTrainingEffect']) + ','
+    csv += str(act['averageHR']) + ','
+    csv += str(act['averageRunningCadenceInStepsPerMinute']) + ','
+    csv += str(act['averageSpeed']) + ','
+    csv += str(act['avgGroundContactBalance']) + ','
+    csv += str(act['avgGroundContactTime']) + ','
+    csv += str(act['avgStrideLength']) + ','
+    csv += str(act['avgVerticalOscillation']) + ','
+    csv += str(act['avgVerticalRatio']) + ','
+    csv += str(act['beginTimestamp']) + ','
+    csv += str(act['calories']) + ','
+    csv += str(act['distance']) + ','
+    csv += str(act['duration']) + ','
+    csv += str(act['elevationGain']) + ','
+    csv += str(act['elevationLoss']) + ','
+    csv += str(act['maxElevation']) + ','
+    csv += str(act['maxHR']) + ','
+    csv += str(act['maxSpeed']) + ','
+    csv += str(act['minElevation']) + ','
+    csv += str(act['startTimeLocal']) + ','
+    csv += str(act['steps']) + '\n'
+
+    return csv
+
+
+def activities(agent, outdir, increment=100):
     global ACTIVITIES
     currentIndex = 0
-    initUrl = ACTIVITIES % (currentIndex, increment)  # 100 activities seems a nice round number
+    initUrl = ACTIVITIES % (currentIndex, increment)
     try:
         response = agent.open(initUrl)
     except:
         print('Wrong credentials for user {}. Skipping.'.format(username))
         return
+    summary = prepare_summary_file(outdir)
     search = json.loads(response.get_data())
     while True:
         if len(search) == 0:
             # All done!
             print('Download complete')
+            summary.close()
             break
 
         for item in search:
             # Read this list of activities and save the files.
-
             activityId = item['activityId']
             activityDate = item['startTimeLocal'][:10]
+            activityName = item['activityName'].encode('utf-8')
+            distance = item['distance']
+            print('{0}: {1}, {2:5.2f}kms'.format(
+                activityDate, activityName, distance / 1000))
+
+            activity_csv = summarize_activity(item)
+            summary.write(activity_csv.encode('utf-8'))
+            print('saved')
             url = TCX % activityId
             file_name = '{}_{}.txt'.format(activityDate, activityId)
             if file_exists_in_folder(file_name, output):
